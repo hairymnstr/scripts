@@ -1,0 +1,119 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import sys, os, time, shutil, getopt, time
+
+# need exifread 2.0.2
+# sudo pip install exifread
+import exifread
+
+def usage():
+    print "NAME"
+    print "    " + sys.argv[0]
+    print ""
+    print "SYNOPSIS"
+    print "    " + sys.argv[0] + " [OPTION]... DIRECTORY..."
+    print ""
+    print "DESCRIPTION"
+    print "    Copy (or move) all of the images from the DIRECTORY to a destination"
+    print "    based on the date and time read from the EXIF data within the images."
+    print ""
+    print "    Files will be saved to DEST/<year>/<month>/<day>/<filename>, DEST"
+    print "    defaults to ~/Pictures,"
+    print "    e.g. ~/Pictures/2015/January/23_Jan_15/IMG_0633.jpg"
+    print ""
+    print "    If more than one directory is specified then images will be copied"
+    print "    from each directory listed in turn."
+    print ""
+    print "    -h, --help"
+    print "        Prints this help then exit"
+    print "    -s, --skip"
+    print "        If a file with the same name is already in the destination folder"
+    print "        it will be skipped rather than prompting the user"
+    print "    -d, --dest="
+    print "        Defines DEST to be something other than ~/Pictures"
+    print "    -v, --verbose"
+    print "        Prints out each copy or directory creation"
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "hsd:v", ["help", "skip", "dest=", "verbose"])
+except getopt.GetoptError as err:
+    print str(err)
+    usage()
+    sys.exit(2)
+
+dest = os.path.expanduser("~/Pictures")
+skip = False
+verbose = False
+for o, a in opts:
+    if o in ("-h", "--help"):
+        usage()
+        sys.exit(0)
+    elif o in ("-s", "--skip"):
+        skip = True
+    elif o in ("-d", "--dest"):
+        if not os.path.isdir(a):
+            print "DEST must be an existing directory"
+            sys.exit(2)
+        dest = a
+    elif o in ("-v", "--verbose"):
+        verbose = True
+
+if len(args) < 1:
+    print "No input folders provided"
+    usage()
+    sys.exit(1)
+
+for d in args:
+    if not os.path.isdir(os.path.expanduser(d)):
+        print d + " is not a directory"
+        sys.exit(1)
+
+for d in args:
+    # list the contents of the folder
+    files = os.listdir(os.path.expanduser(d))
+
+    # work through all the files in the folder
+    for f in files:
+        # only process JPEG images with a .jpg extension
+        # note the lower because cameras usually use FAT which is non-case sensitive
+        # so the case switches arbitrarily depending on drivers
+        if f[-4:].lower() == ".jpg":
+            with open(os.path.join(os.path.expanduser(d), f), "rb") as fr:
+                tags = exifread.process_file(fr, stop_tag='DateTimeOriginal')
+                ts = time.strptime(str(tags['EXIF DateTimeOriginal']), "%Y:%m:%d %H:%M:%S")
+            # build the new directory path
+            target_dir = os.path.join(dest,
+                            time.strftime("%Y", ts),
+                            time.strftime("%B", ts),
+                            time.strftime("%d_%b_%y", ts))
+            # add the file name to the source and dest directories
+            target = os.path.join(target_dir, f)
+            source = os.path.join(d, f)
+            # make the directory if it doesn't exist, and any parents
+            # using makedirs, an error occurs if you try and make an existing directory
+            # so we need to check it isn't already there first
+            if not os.path.isdir(target_dir):
+                if verbose:
+                    print "makedirs(%s)" % (target_dir)
+                os.makedirs(target_dir)     # works like "mkdir -p" on POSIX systems
+            # to make this a little more "safe", we now check that we aren't overwriting
+            # anything.  If we are the user gets to choose
+            # default to doing the write, the user changes this if the file exists
+            a = "o"
+            if os.path.isfile(target):
+                if skip:
+                    a = "s"
+                else:
+                    # ask the user what to do
+                    a = raw_input("File exists (O)verwrite, (S)kip - default or (A)bort script? ")
+            # use lower() to ignore the case
+            # user said overwrite so just do the copy anyway
+            if a.lower() == "o":
+                if verbose:
+                    print "copy(%s,%s)" % (source, target)
+                shutil.copy(source, target)
+            # the user said abort the script so exit python
+            elif a.lower() == "a":
+                sys.exit(-2)
+            # any other input does the default which is to skip the file.  Note if
+            # you are using move this will leave the file in the source location
