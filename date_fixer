@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+import piexif, sys, time, getopt
+
+def usage():
+    print "NAME"
+    print "    " + sys.argv[0]
+    print ""
+    print "SYNOPSIS"
+    print "    " + sys.argv[0] + " [OPTION]... IMAGE_FILE..."
+    print ""
+    print "DESCRIPTION"
+    print "    Change the DateTimeOriginal Exif tag on several image files"
+    print "    based on a single date offset."
+    print ""
+    print "    -h, --help"
+    print "        Print this help and then exit"
+    print "    --date-offset="
+    print "        Offset to apply to the date/time field in seconds this"
+    print "        is added to the UNIX timestamp created from the Exif"
+    print "        data so to adjust a timestamp backwards specify a"
+    print "        negative offset value."
+    print "    --date-from="
+    print "        A reference timestamp in the format \"YYYY:MM:DD HH:MM:SS\""
+    print "        When specified with --date-to= the offset is calculated"
+    print "        based on a file currently containing the date-from and"
+    print "        corrected to a file with the date-to"
+    print "    --date-to="
+    print "        Works with --date-from= to specify an offset see date-from."
+    
+def change_date(filename, offset):
+    exif_dict = piexif.load(filename)
+
+    dt = time.mktime(time.strptime(exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal], "%Y:%m:%d %H:%M:%S"))
+
+    dt += offset
+
+    ts = time.localtime(dt)
+
+    new_date_string = time.strftime("%Y:%m:%d %H:%M:%S", ts)
+
+    exif_dict['Exif'][piexif.ExifIFD.DateTimeOriginal] = new_date_string
+
+    exif_bytes = piexif.dump(exif_dict)
+
+    piexif.insert(exif_bytes, filename)
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "h", ["help", "date-offset=", "date-from=", "date-to="])
+except getopt.GetoptError as err:
+    print str(err)
+    print sys.argv[0] + ": try --help for mor info"
+    sys.exit(2)
+    
+offset = None
+datefrom = None
+dateto = None
+for o, a in opts:
+    if o in ("-h", "--help"):
+        usage()
+        sys.exit(0)
+    elif o == "--date-offset":
+        offset = float(a)
+    elif o == "--date-from":
+        datefrom = time.mktime(time.strptime(a, "%Y:%m:%d %H:%M:%S"))
+    elif o == "--date-to":
+        dateto = time.mktime(time.strptime(a, "%Y:%m:%d %H:%M:%S"))
+
+if datefrom != None and dateto != None:
+    offset = dateto - datefrom
+    
+if offset == None:
+    print sys.argv[0] + ": you must specify offset or date-from and to"
+    print "try '%s --help' for more info" % sys.argv[0]
+    sys.exit(-2)
+
+for f in args:
+    change_date(f, offset)
