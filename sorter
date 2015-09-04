@@ -56,13 +56,15 @@ def usage():
     print "    -s, --skip"
     print "        If a file with the same name is already in the destination folder"
     print "        it will be skipped rather than prompting the user"
+    print "    -m, --move"
+    print "        Move instead of copy the files."
     print "    -d, --dest="
     print "        Defines DEST to be something other than ~/Pictures"
     print "    -v, --verbose"
     print "        Prints out each copy or directory creation"
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "hsd:v", ["help", "skip", "dest=", "verbose"])
+    opts, args = getopt.getopt(sys.argv[1:], "hsd:vm", ["help", "skip", "dest=", "verbose", "move"])
 except getopt.GetoptError as err:
     print str(err)
     usage()
@@ -71,10 +73,13 @@ except getopt.GetoptError as err:
 dest = os.path.expanduser("~/Pictures")
 skip = False
 verbose = False
+move = False
 for o, a in opts:
     if o in ("-h", "--help"):
         usage()
         sys.exit(0)
+    elif o in ("-m", "--move"):
+        move = True
     elif o in ("-s", "--skip"):
         skip = True
     elif o in ("-d", "--dest"):
@@ -136,9 +141,14 @@ for d in args:
             # use lower() to ignore the case
             # user said overwrite so just do the copy anyway
             if a.lower() == "o":
-                if verbose:
-                    print "copy(%s,%s)" % (source, target)
-                shutil.copy(source, target)
+                if move:
+                    if verbose:
+                        print "move(%s,%s)" % (source, target)
+                    shutil.move(source, target)
+                else:
+                    if verbose:
+                        print "copy(%s,%s)" % (source, target)
+                    shutil.copy(source, target)
             # the user said abort the script so exit python
             elif a.lower() == "a":
                 sys.exit(-2)
