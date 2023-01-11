@@ -1,13 +1,46 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-import sys, os, time, shutil, getopt, time
+#!/usr/bin/env python3
+"""
+NAME
+    sorter - A tool for sorting and backing up photos
 
-# need exifread 2.0.2
-# sudo pip install exifread
+SYNOPSIS
+    sorter [OPTION]... DIRECTORY..."
+
+DESCRIPTION
+    Copy (or move) all of the images from the DIRECTORY to a destination
+    based on the date and time read from the EXIF data within the images.
+
+    Files will be saved to DEST/<year>/<month>/<day>/<filename>, DEST
+    defaults to ~/Pictures,
+    e.g. ~/Pictures/2015/January/23_Jan_15/IMG_0633.jpg
+
+    If more than one directory is specified then images will be copied
+    from each directory listed in turn.
+
+    -h, --help
+        Prints this help then exit
+    -s, --skip
+        If a file with the same name is already in the destination folder
+        it will be skipped rather than prompting the user
+    -m, --move
+        Move instead of copy the files.
+    -d, --dest=
+        Defines DEST to be something other than ~/Pictures
+    -v, --verbose
+        Prints out each copy or directory creation
+"""
+import sys
+import os
+import time
+import shutil
+import getopt
+import time
+
+# apt install python3-exifread on Ubuntu 22.04 works
 import exifread
 
 """
-Copyright (c) 2015, Nathan Dumont
+Copyright (c) 2023, Nathan Dumont
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -33,42 +66,15 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-def usage():
-    print "NAME"
-    print "    " + sys.argv[0]
-    print ""
-    print "SYNOPSIS"
-    print "    " + sys.argv[0] + " [OPTION]... DIRECTORY..."
-    print ""
-    print "DESCRIPTION"
-    print "    Copy (or move) all of the images from the DIRECTORY to a destination"
-    print "    based on the date and time read from the EXIF data within the images."
-    print ""
-    print "    Files will be saved to DEST/<year>/<month>/<day>/<filename>, DEST"
-    print "    defaults to ~/Pictures,"
-    print "    e.g. ~/Pictures/2015/January/23_Jan_15/IMG_0633.jpg"
-    print ""
-    print "    If more than one directory is specified then images will be copied"
-    print "    from each directory listed in turn."
-    print ""
-    print "    -h, --help"
-    print "        Prints this help then exit"
-    print "    -s, --skip"
-    print "        If a file with the same name is already in the destination folder"
-    print "        it will be skipped rather than prompting the user"
-    print "    -m, --move"
-    print "        Move instead of copy the files."
-    print "    -d, --dest="
-    print "        Defines DEST to be something other than ~/Pictures"
-    print "    -v, --verbose"
-    print "        Prints out each copy or directory creation"
+def error_exit(message, code):
+    print(message)
+    print("Try 'sorter --help' for more information.")
+    sys.exit(code)
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], "hsd:vm", ["help", "skip", "dest=", "verbose", "move"])
 except getopt.GetoptError as err:
-    print str(err)
-    usage()
-    sys.exit(2)
+    error_exit(str(err))
 
 dest = os.path.expanduser("~/Pictures")
 skip = False
@@ -76,7 +82,7 @@ verbose = False
 move = False
 for o, a in opts:
     if o in ("-h", "--help"):
-        usage()
+        print(__doc__)
         sys.exit(0)
     elif o in ("-m", "--move"):
         move = True
@@ -84,21 +90,17 @@ for o, a in opts:
         skip = True
     elif o in ("-d", "--dest"):
         if not os.path.isdir(a):
-            print "DEST must be an existing directory"
-            sys.exit(2)
+            error_exit("DEST must be an existing directory", -2)
         dest = a
     elif o in ("-v", "--verbose"):
         verbose = True
 
 if len(args) < 1:
-    print "No input folders provided"
-    usage()
-    sys.exit(1)
+    error_exit("No input folders provided", -1)
 
 for d in args:
     if not os.path.isdir(os.path.expanduser(d)):
-        print d + " is not a directory"
-        sys.exit(1)
+        error_exit(d + " is not a directory", -1)
 
 for d in args:
     # list the contents of the folder
@@ -126,7 +128,7 @@ for d in args:
             # so we need to check it isn't already there first
             if not os.path.isdir(target_dir):
                 if verbose:
-                    print "makedirs(%s)" % (target_dir)
+                    print(f"makedirs({target_dir})")
                 os.makedirs(target_dir)     # works like "mkdir -p" on POSIX systems
             # to make this a little more "safe", we now check that we aren't overwriting
             # anything.  If we are the user gets to choose
@@ -137,17 +139,17 @@ for d in args:
                     a = "s"
                 else:
                     # ask the user what to do
-                    a = raw_input("File exists (O)verwrite, (S)kip - default or (A)bort script? ")
+                    a = input("File exists (O)verwrite, (S)kip - default or (A)bort script? ")
             # use lower() to ignore the case
             # user said overwrite so just do the copy anyway
             if a.lower() == "o":
                 if move:
                     if verbose:
-                        print "move(%s,%s)" % (source, target)
+                        print(f"move({source},{target})")
                     shutil.move(source, target)
                 else:
                     if verbose:
-                        print "copy(%s,%s)" % (source, target)
+                        print(f"copy({source},{target})")
                     shutil.copy(source, target)
             # the user said abort the script so exit python
             elif a.lower() == "a":
